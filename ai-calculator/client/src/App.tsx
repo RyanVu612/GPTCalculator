@@ -1,7 +1,5 @@
-import { useState, useMemo, useRef, useState } from 'react'
-import { create, all } from 'mathjs'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { useEffect, useRef, useState } from "react";
+import { create, all } from "mathjs";
 
 const math = create(all, { number: "number"});
 
@@ -36,18 +34,18 @@ export default function App() {
 
   // Install degree support for mathjs: allow expressions like sin(30 deg)
   // In DEG mode, we automatically transform plain trig calls into unit form.
-  const transformForDegrees = (s: string) => {
+  const transformForDegrees = (s: string): string => {
     // Wrap arguments to sin|cos|tan when not already using a unit.
-    return s.replace(/(sin|cos|tan)\(([^()]+)\)/g, (m, fn, arg) => {
+    return s.replace(/(sin|cos|tan)\(([^()]+)\)/g, (m, fn, arg): string => {
     // If "deg" is already present, leave as is
       if (/deg\b/i.test(arg)) return m;
       return `${fn}(${arg} deg)`;
     });
   };
 
-  const safeEvalLocal = (s: string) => {
+  const safeEvalLocal = (s: string): number | string => {
     // map caret to power for mathjs (it already supports ^)
-    let q = s;
+    let q: string = s;
     if (angleMode === "DEG") q = transformForDegrees(q);
 
     // map ln(x) -> log(x, e) for clarity; mathjs supports log(x)
@@ -55,12 +53,10 @@ export default function App() {
 
     // Evaluate
     const v = math.evaluate(q);
-    if (typeof v === "number") return v;
-    // For vectors/matrices or units, stringify
-    return math.format(v);
+    return typeof v === "number" ? v : math.format(v as any);
   };
 
-  const handleEquals = async () => {
+  const handleEquals = async (): Promise<void> => {
     setError(null);
     setResult(null);
     const trimmed = expr.trim();
@@ -88,10 +84,10 @@ export default function App() {
       setError(e?.message || String(e));
     }
   }
-};
 
+// Keyboard handler
 const onKey = (e: KeyboardEvent) => {
-  if (e.key === "Enter") { e.preventDefault(); handleEquals();}
+  if (e.key === "Enter") { e.preventDefault(); void handleEquals(); }
   if (e.key === "Escape") { setExpr(""); setResult(null); setError(null); }
 };
 
@@ -152,7 +148,8 @@ return (
 
           <div className="grid grid-cols-4 gap-2">
             {KEYS.map(k => (
-              <button key={k} onClick={() => press(k)}
+              <button 
+                key={k} onClick={() => press(k)}
                 className={`py-3 rounded-xl border shadow-sm hover:shadow ${k === "=" ? "col-span-1 bg-slate-900 text-white" : "bg-white"}`}>
                 {k}
               </button>
@@ -209,4 +206,5 @@ return (
       Built with React • Local math via mathjs • Optional AI evaluation via OpenAI API
     </footer>
   </div>
-)
+);
+}
