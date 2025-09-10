@@ -33,12 +33,13 @@ const FN_KEYS: KeyDef[] = [
   { k: "sin(",  label: "sin",  variant: "fn" },
   { k: "cos(",  label: "cos",  variant: "fn" },
   { k: "tan(",  label: "tan",  variant: "fn" },
-  { k: "log(",  label: "log",  variant: "fn" },
+  { k: "log10(", label: "log", variant: "fn" }, // <- base 10
   { k: "ln(",   label: "ln",   variant: "fn" },
   { k: "exp(",  label: "exp",  variant: "fn" },
   { k: "sqrt(", label: "√",    variant: "fn" },
   { k: "^",     label: "x^y",  variant: "fn" },
 ];
+
 
 export default function App() {
   const [expr, setExpr] = useState("");
@@ -62,7 +63,7 @@ export default function App() {
   const safeEvalLocal = (s: string): number | string => {
     let q: string = s;
     if (angleMode === "DEG") q = transformForDegrees(q);
-    q = q.replace(/\bln\(/g, "log(");
+    q = q.replace(/\bln\(/g, "log("); // ln -> natural log
     const v = math.evaluate(q);
     return typeof v === "number" ? v : math.format(v as any);
   };
