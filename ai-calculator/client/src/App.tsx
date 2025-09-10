@@ -135,7 +135,8 @@ export default function App() {
       background: "#fff",
       borderRadius: 16,
       boxShadow: "0 10px 30px rgba(0,0,0,.08)",
-      padding: 16
+      padding: 16,
+      color: "#0f172a",
     },
 
     display: {
@@ -162,7 +163,14 @@ export default function App() {
     },
 
     inputRow: { display: "flex", gap: 8, marginBottom: 8 },
-    input: { flex: 1, padding: "10px 12px", borderRadius: 8, border: "1px solid #e5e7eb" },
+    input: { 
+      flex: 1, 
+      padding: "10px 12px", 
+      borderRadius: 8, 
+      border: "1px solid #e5e7eb",
+      background: "#fff",
+      color: "#0f172a", 
+    },
 
     fnGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 8 },
     mainGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 },
@@ -174,13 +182,14 @@ export default function App() {
       background: "#fff",
       boxShadow: "0 1px 2px rgba(0,0,0,.04)",
       fontSize: 16,
-      cursor: "pointer" as const
+      cursor: "pointer" as const,
+      color: "#0f172a",
     },
     kNum: {},
     kOp:  { background: "#f8fafc" },
     kFn:  { background: "#f8fafc", fontSize: 14, padding: 8 },
     kUtil:{ background: "#e2e8f0", color: "#334155" },
-    kEq:  { background: "#0f172a", color: "#fff" }
+    kEq:   { background: "#0f172a", color: "#fff" },
   };
 
   const keyStyle = (variant?: KeyDef["variant"]): React.CSSProperties => {
