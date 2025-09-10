@@ -24,7 +24,9 @@ const MAIN_KEYS: KeyDef[] = [
   // Row 4
   { label: "1", variant: "num" }, { label: "2", variant: "num" }, { label: "3", variant: "num" }, { label: "−", k: "-", variant: "op" },
   // Row 5
-  { label: "0", span: 2, variant: "num" }, { label: ".", variant: "num" }, { label: "=", k: "=", variant: "eq" },
+  { label: "0", span: 2, variant: "num" }, { label: ".", variant: "num" }, { label: "+", k: "+", variant: "op" },
+  // Row 6 (full-width equals)
+  { label: "=", k: "=", variant: "eq", span: 4 },
 ];
 
 const FN_KEYS: KeyDef[] = [
@@ -269,7 +271,7 @@ export default function App() {
               key={`${def.label}-${idx}`}
               style={{
                 ...keyStyle(def.variant),
-                ...(def.span === 2 ? { gridColumn: "span 2" } : null)
+                ...(def.span ? { gridColumn: `span ${def.span}` } : null)
               }}
               onClick={() => handleKey(def)}
             >
