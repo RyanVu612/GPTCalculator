@@ -19,39 +19,30 @@ app.use(express.json());
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
-/** ---- helpers ---- **/
+// --- helpers ---
 
-// Add "deg" automatically for sin/cos/tan when angleMode === "DEG"
-function transformForDegrees(s) {
-  return s.replace(
-    /(sin|cos|tan)\(([^()]+)\)/gi,
-    (m, fn, arg) => (/deg\b/i.test(arg) ? m : `${fn}(${arg} deg)`)
-  );
-}
-
-// Evaluate a strict expression with mathjs (no AI)
-function evalStrict(expr, angleMode) {
-  let q = String(expr);
-  if ((angleMode || "RAD") === "DEG") q = transformForDegrees(q);
-  // ln(x) -> natural log in mathjs
-  q = q.replace(/\bln\(/gi, "log(");
-  const v = math.evaluate(q);
-  return typeof v === "number" ? v : math.format(v);
-}
-
-// After removing allowed words, do we only have mathy chars?
 function isLikelyMath(s) {
   const allowedWords = /(sin|cos|tan|log10|ln|exp|sqrt|pi|deg|rad|e)/gi;
   const stripped = s.replace(allowedWords, "");
   return /^[\s0-9+\-*/^().,eE]+$/.test(stripped);
 }
 
-// Try to strip leading English phrases while keeping operators & known funcs
+function hasOpOrFunc(s) {
+  const hasOp = /[+\-*/^()]/.test(s);
+  const hasFunc = /\b(sin|cos|tan|log10|ln|exp|sqrt)\b/i.test(s);
+  return hasOp || hasFunc;
+}
+
+function hasDigitOrConst(s) {
+  const hasDigit = /\d/.test(s);
+  const hasConst = /\b(pi|e)\b/i.test(s);
+  return hasDigit || hasConst;
+}
+
+// Try to strip English boilerplate WITHOUT making a bare number
 function tryStripEnglish(s) {
-  let t = s.replace(/[^0-9a-z+\-*/^().,\s]/gi, " "); // remove odd chars
-  // Remove common lead-ins like "what is", "calculate", "compute", etc.
+  let t = s.replace(/[^0-9a-z+\-*/^().,\s]/gi, " ");
   t = t.replace(/\b(what\s+is|calculate|compute|please|solve|evaluate)\b/gi, " ");
-  // Drop unknown words (keep digits and known function/units/consts)
   const keep = new Set(["sin","cos","tan","log10","ln","exp","sqrt","pi","deg","rad","e"]);
   t = t.replace(/\b([a-z]+)\b/gi, (m, w) => (keep.has(w.toLowerCase()) ? m : " "));
   t = t.replace(/\s+/g, " ").trim();
@@ -122,38 +113,43 @@ app.post("/api/eval", async (req, res) => {
     }
     const text = expression.trim();
 
-    // 1) Fast path: the text is already math
-    if (isLikelyMath(text)) {
+    // 1) Already math? Only if it actually has an operator/function AND a digit/constant
+    if (isLikelyMath(text) && hasOpOrFunc(text) && hasDigitOrConst(text)) {
       try {
         const result = evalStrict(text, angleMode || "RAD");
         return res.json({ result });
       } catch (e) {
-        return res.status(400).json({ error: (e && e.message) || "Invalid expression" });
+        return res.status(400).json({ error: e?.message || "Invalid expression" });
       }
     }
 
-    // 2) Try stripping English and re-check
+    // 2) Try stripping boilerplate; still require operator/function
     const stripped = tryStripEnglish(text);
-    if (stripped && isLikelyMath(stripped)) {
+    if (
+      stripped &&
+      stripped !== text &&
+      isLikelyMath(stripped) &&
+      hasOpOrFunc(stripped) &&
+      hasDigitOrConst(stripped)
+    ) {
       try {
         const result = evalStrict(stripped, angleMode || "RAD");
         return res.json({ result, normalized: stripped });
-      } catch (e) {
+      } catch {
         // fall through to AI
       }
     }
 
-    // 3) Natural language → normalize with AI, then evaluate locally
+    // 3) Otherwise, normalize with AI then evaluate locally
     const normalized = await normalizeWithAI(text);
     if (!normalized || typeof normalized !== "string") {
       return res.status(400).json({ error: "Normalization failed" });
     }
-
     try {
       const result = evalStrict(normalized, angleMode || "RAD");
       return res.json({ result, normalized });
     } catch (e) {
-      return res.status(400).json({ error: (e && e.message) || "Invalid normalized expression", normalized });
+      return res.status(400).json({ error: e?.message || "Invalid normalized expression", normalized });
     }
   } catch (err) {
     console.error("[/api/eval] Server error:", err);
