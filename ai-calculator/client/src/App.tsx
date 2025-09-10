@@ -1,60 +1,76 @@
+// src/App.tsx
 import { useEffect, useRef, useState } from "react";
 import { create, all } from "mathjs";
 
-const math = create(all, { number: "number"});
+const math = create(all, { number: "number" });
 
-const KEYS = [
-  "7", "8", "9", "/",
-  "4", "5", "6", "*",
-  "1", "2", "3", "-",
-  "0", ".", "=", "+"
+type KeyDef = {
+  label: string;
+  k?: string;                 // value to insert (defaults to label)
+  span?: 2 | 3 | 4;
+  variant?: "num" | "op" | "fn" | "util" | "eq";
+};
+
+const MAIN_KEYS: KeyDef[] = [
+  // Row 1
+  { label: "AC", k: "[CLEAR]", variant: "util" },
+  { label: "DEL", k: "[DEL]",  variant: "util" },
+  { label: "(", variant: "op" },
+  { label: ")", variant: "op" },
+  // Row 2
+  { label: "7", variant: "num" }, { label: "8", variant: "num" }, { label: "9", variant: "num" }, { label: "÷", k: "/", variant: "op" },
+  // Row 3
+  { label: "4", variant: "num" }, { label: "5", variant: "num" }, { label: "6", variant: "num" }, { label: "×", k: "*", variant: "op" },
+  // Row 4
+  { label: "1", variant: "num" }, { label: "2", variant: "num" }, { label: "3", variant: "num" }, { label: "−", k: "-", variant: "op" },
+  // Row 5
+  { label: "0", span: 2, variant: "num" }, { label: ".", variant: "num" }, { label: "=", k: "=", variant: "eq" },
 ];
 
-const FN_KEYS = [
-  { k: "sin(", label: "sin" },
-  { k: "cos(", label: "cos" },
-  { k: "tan(", label: "tan" },
-  { k: "^", label: "x^y" },
-  { k: "log(", label: "log10" },
-  { k: "ln(", label: "ln" },
-  { k: "exp(", label: "exp" },
-  { k: "sqrt(", label: "√" },
-  { k: "(", label: "(" },
-  { k: ")", label: ")" },
+const FN_KEYS: KeyDef[] = [
+  { k: "sin(",  label: "sin",  variant: "fn" },
+  { k: "cos(",  label: "cos",  variant: "fn" },
+  { k: "tan(",  label: "tan",  variant: "fn" },
+  { k: "log(",  label: "log",  variant: "fn" },
+  { k: "ln(",   label: "ln",   variant: "fn" },
+  { k: "exp(",  label: "exp",  variant: "fn" },
+  { k: "sqrt(", label: "√",    variant: "fn" },
+  { k: "^",     label: "x^y",  variant: "fn" },
 ];
 
 export default function App() {
   const [expr, setExpr] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<{ in: string; out: string }[]>([]);
+  const [history, setHistory] = useState<Array<{ in: string; out: string }>>([]);
   const [angleMode, setAngleMode] = useState<"RAD" | "DEG">("RAD");
   const [useAI, setUseAI] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Install degree support for mathjs: allow expressions like sin(30 deg)
-  // In DEG mode, we automatically transform plain trig calls into unit form.
-  const transformForDegrees = (s: string): string => {
-    // Wrap arguments to sin|cos|tan when not already using a unit.
-    return s.replace(/(sin|cos|tan)\(([^()]+)\)/g, (m, fn, arg): string => {
-    // If "deg" is already present, leave as is
-      if (/deg\b/i.test(arg)) return m;
-      return `${fn}(${arg} deg)`;
-    });
-  };
+  // --- helpers ---------------------------------------------------------------
+
+  // Add "deg" automatically in DEG mode for sin/cos/tan arguments
+  const transformForDegrees = (s: string): string =>
+    s.replace(
+      /(sin|cos|tan)\(([^()]+)\)/g,
+      (m: string, fn: string, arg: string): string => {
+        if (/deg\b/i.test(arg)) return m;
+        return `${fn}(${arg} deg)`;
+      }
+    );
 
   const safeEvalLocal = (s: string): number | string => {
-    // map caret to power for mathjs (it already supports ^)
     let q: string = s;
     if (angleMode === "DEG") q = transformForDegrees(q);
 
-    // map ln(x) -> log(x, e) for clarity; mathjs supports log(x)
+    // normalize ln(x) to log(x)
     q = q.replace(/\bln\(/g, "log(");
 
-    // Evaluate
     const v = math.evaluate(q);
     return typeof v === "number" ? v : math.format(v as any);
   };
+
+  // --- actions ---------------------------------------------------------------
 
   const handleEquals = async (): Promise<void> => {
     setError(null);
@@ -80,131 +96,132 @@ export default function App() {
         setResult(out);
         setHistory(h => [{ in: trimmed, out }, ...h].slice(0, 20));
       }
-    } catch (e:any) {
-      setError(e?.message || String(e));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     }
-  }
+  };
 
-// Keyboard handler
-const onKey = (e: KeyboardEvent) => {
-  if (e.key === "Enter") { e.preventDefault(); void handleEquals(); }
-  if (e.key === "Escape") { setExpr(""); setResult(null); setError(null); }
-};
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); void handleEquals(); }
+    if (e.key === "Escape") { setExpr(""); setResult(null); setError(null); }
+  };
 
-useEffect(() => {
-  window.addEventListener("keydown", onKey as any);
-  return () => window.removeEventListener("keydown", onKey as any);
-}, [expr, useAI, angleMode]);
+  useEffect(() => {
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expr, useAI, angleMode]);
 
-const press = (k: string) => {
-  if (k === "=") return handleEquals();
-  setExpr(prev => prev + k);
-  inputRef.current?.focus();
-};
+  const press = (k: string) => {
+    if (k === "=") { void handleEquals(); return; }
+    setExpr(prev => prev + k);
+    inputRef.current?.focus();
+  };
 
-const clearAll = () => { setExpr(""); setResult(null); setError(null); };
-const backspace = () => { setExpr(p => p.slice(0, -1)); };
+  const clearAll = () => { setExpr(""); setResult(null); setError(null); };
+  const backspace = () => { setExpr(p => p.slice(0, -1)); };
 
-return (
-  <div className="min-h-screen bg-slate-50 text-slate-900 p-6">
-    <div className="max-w-4xl mx-auto grid md:grid-cols-5 gap-6">
-      <div className="md:col-span-3 space-y-4">
-        <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">AI-Enhanced Calculator</h1>
-          <div className="flex items-center gap-2">
-            <label className="text-sm">Angle</label>
+  const handleKey = (def: KeyDef) => {
+    const val = def.k ?? def.label;
+    if (val === "[CLEAR]") return clearAll();
+    if (val === "[DEL]")   return backspace();
+    if (val === "=")       return void handleEquals();
+    press(val);
+  };
+
+  // --- render ----------------------------------------------------------------
+
+  return (
+    <div style={{ padding: 16 }}>
+      {/* Top bar (title + angle + AI) */}
+      <div style={{ maxWidth: 380, margin: "0 auto 12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h1 style={{ fontSize: 22, margin: 0, fontWeight: 700 }}>AI-Enhanced Calculator</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{ fontSize: 12 }}>Angle</label>
             <select
-              className="border rounded-md px-2 py-1 text-sm"
               value={angleMode}
-              onChange={e => setAngleMode(e.target.value as any)}
+              onChange={e => setAngleMode(e.target.value as "RAD" | "DEG")}
               aria-label="Angle mode"
             >
               <option value="RAD">RAD</option>
               <option value="DEG">DEG</option>
             </select>
-            <label className="text-sm ml-3">AI Eval</label>
+            <label style={{ fontSize: 12 }}>AI</label>
             <input
               type="checkbox"
-              className="w-4 h-4"
               checked={useAI}
               onChange={e => setUseAI(e.target.checked)}
               aria-label="Use AI for evaluation"
             />
           </div>
-        </header>
-
-        <div className="bg-white rounded-2xl shadow p-4 space-y-3">
-          <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              value={expr}
-              onChange={e => setExpr(e.target.value)}
-              placeholder="Type an expression, e.g., sin(30) + 2^3 / 4"
-              className="flex-1 border rounded-lg px-3 py-2 text-lg focus:outline-none focus:ring"
-            />
-            <button onClick={clearAll} className="px-3 py-2 rounded-lg border">C</button>
-            <button onClick={backspace} className="px-3 py-2 rounded-lg border">DEL</button>
-          </div>
-
-          <div className="grid grid-cols-4 gap-2">
-            {KEYS.map(k => (
-              <button 
-                key={k} onClick={() => press(k)}
-                className={`py-3 rounded-xl border shadow-sm hover:shadow ${k === "=" ? "col-span-1 bg-slate-900 text-white" : "bg-white"}`}>
-                {k}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-5 gap-2">
-            {FN_KEYS.map(({ k, label }) => (
-              <button key={label} onClick={() => press(k)} className="py-2 text-sm rounded-xl border shadow-sm bg-white hover:shadow">
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div>
-            {error && (
-              <div className="text-red-600 text-sm">{error}</div>
-            )}
-            {result && (
-              <div className="text-green-700 text-lg font-medium">= {result}</div>
-            )}
-          </div>
         </div>
       </div>
 
-      <aside className="md:col-span-2">
-        <div className="bg-white rounded-2xl shadow p-4 h-full">
-          <h2 className="font-semibold mb-3">History</h2>
-          <ul className="space-y-2 max-h-[520px] overflow-auto pr-1">
+      {/* Calculator card */}
+      <div className="calc-wrap">
+        {/* Display */}
+        <div className="calc-display">
+          <div className="expr">{expr || "\u00A0"}</div>
+          <div className="res">{error ? "Error" : (result ?? "\u00A0")}</div>
+        </div>
+
+        {/* Input row (optional manual typing) */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <input
+            ref={inputRef}
+            value={expr}
+            onChange={e => setExpr(e.target.value)}
+            placeholder="Type an expression…"
+            style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: "1px solid #e5e7eb" }}
+          />
+        </div>
+
+        {/* Function keys */}
+        <div className="fn-grid">
+          {FN_KEYS.map(def => (
+            <button
+              key={def.label}
+              className="key fn"
+              onClick={() => handleKey(def)}
+            >
+              {def.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Main keypad */}
+        <div className="main-grid">
+          {MAIN_KEYS.map((def, idx) => (
+            <button
+              key={`${def.label}-${idx}`}
+              className={`key ${def.variant || "num"} ${def.span === 2 ? "span-2" : ""}`}
+              onClick={() => handleKey(def)}
+            >
+              {def.label}
+            </button>
+          ))}
+        </div>
+
+        {/* History */}
+        <div style={{ marginTop: 12 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>History</h2>
+          <ul style={{ maxHeight: 150, overflow: "auto", paddingRight: 4, margin: 0 }}>
             {history.length === 0 && (
-              <li className="text-sm text-slate-500">No calculations yet.</li>
+              <li style={{ fontSize: 12, color: "#64748b", listStyle: "none" }}>No calculations yet.</li>
             )}
             {history.map((h, i) => (
-              <li key={i} className="border rounded-lg p-2">
-                <div className="text-xs text-slate-500">{h.in}</div>
-                <div className="text-right font-medium">= {h.out}</div>
+              <li key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8, marginBottom: 6, listStyle: "none" }}>
+                <div style={{ fontSize: 12, color: "#64748b" }}>{h.in}</div>
+                <div style={{ textAlign: "right", fontWeight: 600 }}>= {h.out}</div>
               </li>
             ))}
           </ul>
-          <div className="text-xs text-slate-500 mt-4 space-y-1">
-            <p><strong>Tips</strong></p>
-            <ul className="list-disc pl-4 space-y-1">
-              <li>Use ^ for powers: <code>2^8</code></li>
-              <li>Trig defaults to radians. Switch to DEG or type <code>sin(30 deg)</code></li>
-              <li>Common functions: <code>sin</code>, <code>cos</code>, <code>tan</code>, <code>log</code> (base 10), <code>ln</code> (natural), <code>exp</code>, <code>sqrt</code></li>
-              <li>Press Enter to evaluate</li>
-            </ul>
-          </div>
         </div>
-      </aside>
-    </div>
+      </div>
 
-    <footer className="text-center text-xs text-slate-500 mt-6">
-      Built with React • Local math via mathjs • Optional AI evaluation via OpenAI API
-    </footer>
-  </div>
-);
+      <div style={{ textAlign: "center", fontSize: 12, color: "#64748b", marginTop: 10 }}>
+        Built with React • Local math via mathjs • Optional AI evaluation via OpenAI API
+      </div>
+    </div>
+  );
 }
