@@ -64,44 +64,25 @@ Rules:
     { role: "user", content: nl }
   ];
 
-  // Prefer precise JSON schema, then fall back to json_object, then plain
-  const schema = {
-    type: "object",
-    properties: { expression: { type: "string" } },
-    required: ["expression"],
-    additionalProperties: false,
-  };
-
-  // Try with json_schema
+  // Try with json_object
   try {
     const r = await openai.chat.completions.create({
       model: MODEL,
       temperature: 0,
-      response_format: { type: "json_schema", json_schema: { name: "expr", schema } },
+      response_format: "json_object",
       messages
     });
     const content = r.choices?.[0]?.message?.content ?? "";
     return JSON.parse(content)?.expression;
   } catch {
-    // Try with json_object
-    try {
-      const r = await openai.chat.completions.create({
-        model: MODEL,
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages
-      });
-      const content = r.choices?.[0]?.message?.content ?? "";
-      return JSON.parse(content)?.expression;
-    } catch {
-      // Last resort: plain text, try to extract backticked or quoted expr
-      const r = await openai.chat.completions.create({ model: MODEL, temperature: 0, messages });
-      const raw = r.choices?.[0]?.message?.content ?? "";
-      const m = raw.match(/"expression"\s*:\s*"([^"]+)"/) || raw.match(/`([^`]+)`/);
-      return m ? m[1] : null;
-    }
+    // Last resort: plain text, try to extract backticked or quoted expr
+    const r = await openai.chat.completions.create({ model: MODEL, temperature: 0, messages });
+    const raw = r.choices?.[0]?.message?.content ?? "";
+    const m = raw.match(/"expression"\s*:\s*"([^"]+)"/) || raw.match(/`([^`]+)`/);
+    return m ? m[1] : null;
   }
 }
+
 
 /** ---- route ---- **/
 
