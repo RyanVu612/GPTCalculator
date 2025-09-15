@@ -39,6 +39,44 @@ function hasDigitOrConst(s) {
   return hasDigit || hasConst;
 }
 
+// Strict evaluator with mathjs + angle mode
+function evalStrict(expr, angleMode = "RAD") {
+  // Allow only the tokens you said were allowed
+  const ALLOWED = /^(?:[0-9]+(?:\.[0-9]+)?|pi|e|sin|cos|tan|log10|ln|exp|sqrt|\+|\-|\*|\/|\^|\(|\)|\s|deg|rad)+$/i;
+  if (!ALLOWED.test(expr)) {
+    throw new Error("Expression contains disallowed tokens");
+  }
+
+  // Normalize constants
+  let s = expr
+    .replace(/\bPI\b/gi, "pi")
+    .replace(/\bE\b/g, "e")
+    .replace(/\bRAD\b/gi, "rad")
+    .replace(/\bDEG\b/gi, "deg");
+
+  // Handle explicit degree/radian suffix like: 30 deg, 1.2 rad
+  // We convert "<num> deg" -> "(<num> * pi/180)" and "<num> rad" -> "(<num>)"
+  s = s.replace(/(\d+(?:\.\d+)?)\s*deg\b/gi, "($1 * pi / 180)");
+  s = s.replace(/(\d+(?:\.\d+)?)\s*rad\b/gi, "($1)");
+
+  // If angleMode is DEG, wrap sin/cos/tan arguments with deg->rad conversion
+  if (/^DEG$/i.test(angleMode)) {
+    s = s
+      .replace(/\bsin\s*\(([^)]+)\)/gi, "sin(($1) * pi / 180)")
+      .replace(/\bcos\s*\(([^)]+)\)/gi, "cos(($1) * pi / 180)")
+      .replace(/\btan\s*\(([^)]+)\)/gi, "tan(($1) * pi / 180)");
+  }
+
+  // ln(x) -> log(x, e) in mathjs; log10(x) is supported as log10
+  s = s.replace(/\bln\s*\(/gi, "log(");
+
+  // Evaluate with mathjs (number mode already configured)
+  const result = math.evaluate(s);
+  if (!isFinite(result)) throw new Error("Non-finite result");
+  return result;
+}
+
+
 // Try to strip English boilerplate WITHOUT making a bare number
 function tryStripEnglish(s) {
   let t = s.replace(/[^0-9a-z+\-*/^().,\s]/gi, " ");
@@ -64,7 +102,7 @@ Rules:
     { role: "user", content: nl }
   ];
 
-  // Try with json_object
+  // Preferred: JSON object
   try {
     const r = await openai.chat.completions.create({
       model: MODEL,
@@ -75,13 +113,18 @@ Rules:
     const content = r.choices?.[0]?.message?.content ?? "";
     return JSON.parse(content)?.expression;
   } catch {
-    // Last resort: plain text, try to extract backticked or quoted expr
-    const r = await openai.chat.completions.create({ model: MODEL, temperature: 0, messages });
+    // Fallback: plain text, extract
+    const r = await openai.chat.completions.create({
+      model: MODEL,
+      temperature: 0,
+      messages
+    });
     const raw = r.choices?.[0]?.message?.content ?? "";
     const m = raw.match(/"expression"\s*:\s*"([^"]+)"/) || raw.match(/`([^`]+)`/);
     return m ? m[1] : null;
   }
 }
+
 
 
 /** ---- route ---- **/
