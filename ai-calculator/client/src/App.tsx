@@ -136,39 +136,39 @@ export default function App() {
       userSelect: "none" as const,
     };
 
+    // All colored buttons now use the same blue gradient
+    const blueGradientStyle = {
+      background: "linear-gradient(135deg, #74b9ff 0%, #00cec9 100%)",
+      color: "white",
+      textShadow: "0 1px 2px rgba(0,0,0,0.2)"
+    };
+
     switch (variant) {
       case "op":   
         return { 
           ...baseStyle, 
-          background: "linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%)",
-          color: "white",
-          textShadow: "0 1px 2px rgba(0,0,0,0.2)"
+          ...blueGradientStyle
         };
       case "fn":   
         return { 
           ...baseStyle, 
-          background: "linear-gradient(135deg, #74b9ff 0%, #00cec9 100%)",
-          color: "white",
+          ...blueGradientStyle,
           fontSize: 16,
           padding: "12px 6px",
-          textShadow: "0 1px 2px rgba(0,0,0,0.2)"
         };
       case "util": 
         return { 
           ...baseStyle, 
-          background: "linear-gradient(135deg, #a29bfe 0%, #fd79a8 100%)",
-          color: "white",
-          textShadow: "0 1px 2px rgba(0,0,0,0.2)"
+          ...blueGradientStyle
         };
       case "eq":   
         return { 
           ...baseStyle, 
-          background: "linear-gradient(135deg, #ff6b6b 0%, #feca57 50%, #48dbfb 100%)",
-          color: "white",
+          ...blueGradientStyle,
           fontSize: 20,
           fontWeight: 700,
           textShadow: "0 2px 4px rgba(0,0,0,0.3)",
-          boxShadow: "0 6px 20px rgba(255,107,107,0.4), 0 2px 8px rgba(255,255,255,.2) inset"
+          boxShadow: "0 6px 20px rgba(116, 185, 255, 0.4), 0 2px 8px rgba(255,255,255,.2) inset"
         };
       default:     
         return {
@@ -243,7 +243,7 @@ export default function App() {
               aria-label="Use AI for evaluation"
               style={{
                 transform: "scale(1.2)",
-                accentColor: "#fd79a8"
+                accentColor: "#74b9ff"
               }}
             />
           </div>
@@ -330,7 +330,7 @@ export default function App() {
               onClick={() => handleKey(def)}
               onMouseEnter={e => {
                 e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,.3), 0 2px 8px rgba(255,255,255,.15) inset";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(116, 185, 255, 0.5), 0 2px 8px rgba(255,255,255,.15) inset";
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.transform = "translateY(0)";
@@ -359,15 +359,19 @@ export default function App() {
               onMouseEnter={e => {
                 e.currentTarget.style.transform = "translateY(-2px)";
                 if (def.variant === "eq") {
-                  e.currentTarget.style.boxShadow = "0 8px 25px rgba(255,107,107,0.6), 0 2px 8px rgba(255,255,255,.3) inset";
-                } else {
+                  e.currentTarget.style.boxShadow = "0 8px 25px rgba(116, 185, 255, 0.6), 0 2px 8px rgba(255,255,255,.3) inset";
+                } else if (def.variant === "num") {
                   e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,.3), 0 2px 8px rgba(255,255,255,.15) inset";
+                } else {
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(116, 185, 255, 0.5), 0 2px 8px rgba(255,255,255,.15) inset";
                 }
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.transform = "translateY(0)";
                 if (def.variant === "eq") {
-                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(255,107,107,0.4), 0 2px 8px rgba(255,255,255,.2) inset";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(116, 185, 255, 0.4), 0 2px 8px rgba(255,255,255,.2) inset";
+                } else if (def.variant === "num") {
+                  e.currentTarget.style.boxShadow = "0 4px 15px rgba(0,0,0,.2), 0 2px 8px rgba(255,255,255,.1) inset";
                 } else {
                   e.currentTarget.style.boxShadow = "0 4px 15px rgba(0,0,0,.2), 0 2px 8px rgba(255,255,255,.1) inset";
                 }
