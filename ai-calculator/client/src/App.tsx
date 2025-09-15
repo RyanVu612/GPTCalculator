@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useEffect, useRef, useState } from "react";
 import { create, all } from "mathjs";
 
@@ -39,7 +38,6 @@ const FN_KEYS: KeyDef[] = [
   { k: "sqrt(", label: "√",    variant: "fn" },
   { k: "^",     label: "x^y",  variant: "fn" },
 ];
-
 
 export default function App() {
   const [expr, setExpr] = useState("");
@@ -124,141 +122,220 @@ export default function App() {
     press(val);
   };
 
-  // ---------- inline styles ----------
-  const S = {
-    page: { padding: 16 },
-    topBar: { maxWidth: 380, margin: "0 auto 12px" },
-    topRow: { display: "flex", justifyContent: "space-between", alignItems: "center" } as const,
-    title: { fontSize: 22, margin: 0, fontWeight: 700 },
-    controls: { display: "flex", alignItems: "center", gap: 8 },
-
-    card: {
-      maxWidth: 380,
-      margin: "0 auto",
-      background: "#fff",
-      borderRadius: 16,
-      boxShadow: "0 10px 30px rgba(0,0,0,.08)",
-      padding: 16,
-      color: "#0f172a",
-    },
-
-    display: {
-      background: "#0f172a",
-      color: "#fff",
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 12
-    },
-    expr: {
-      fontSize: 12,
-      color: "#94a3b8",
-      minHeight: 16,
-      textAlign: "right" as const,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap" as const
-    },
-    res: {
-      fontSize: 28,
-      fontWeight: 600,
-      textAlign: "right" as const,
-      minHeight: 40
-    },
-
-    inputRow: { display: "flex", gap: 8, marginBottom: 8 },
-    input: { 
-      flex: 1, 
-      padding: "10px 12px", 
-      borderRadius: 8, 
-      border: "1px solid #e5e7eb",
-      background: "#fff",
-      color: "#0f172a", 
-    },
-
-    fnGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 8 },
-    mainGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 },
-
-    keyBase: {
-      padding: 12,
-      border: "1px solid #e5e7eb",
-      borderRadius: 12,
-      background: "#fff",
-      boxShadow: "0 1px 2px rgba(0,0,0,.04)",
-      fontSize: 16,
-      cursor: "pointer" as const,
-      color: "#0f172a",
-    },
-    kNum: {},
-    kOp:  { background: "#f8fafc" },
-    kFn:  { background: "#f8fafc", fontSize: 14, padding: 8 },
-    kUtil:{ background: "#e2e8f0", color: "#334155" },
-    kEq:   { background: "#0f172a", color: "#fff" },
-  };
-
   const keyStyle = (variant?: KeyDef["variant"]): React.CSSProperties => {
+    const baseStyle = {
+      padding: "14px 8px",
+      border: "1px solid rgba(255, 255, 255, 0.2)",
+      borderRadius: 16,
+      fontSize: 18,
+      fontWeight: 600,
+      cursor: "pointer" as const,
+      transition: "all 0.2s ease",
+      backdropFilter: "blur(10px)",
+      boxShadow: "0 4px 15px rgba(0,0,0,.2), 0 2px 8px rgba(255,255,255,.1) inset",
+      userSelect: "none" as const,
+    };
+
     switch (variant) {
-      case "op":   return { ...S.keyBase, ...S.kOp };
-      case "fn":   return { ...S.keyBase, ...S.kFn };
-      case "util": return { ...S.keyBase, ...S.kUtil };
-      case "eq":   return { ...S.keyBase, ...S.kEq };
-      default:     return { ...S.keyBase, ...S.kNum };
+      case "op":   
+        return { 
+          ...baseStyle, 
+          background: "linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%)",
+          color: "white",
+          textShadow: "0 1px 2px rgba(0,0,0,0.2)"
+        };
+      case "fn":   
+        return { 
+          ...baseStyle, 
+          background: "linear-gradient(135deg, #74b9ff 0%, #00cec9 100%)",
+          color: "white",
+          fontSize: 16,
+          padding: "12px 6px",
+          textShadow: "0 1px 2px rgba(0,0,0,0.2)"
+        };
+      case "util": 
+        return { 
+          ...baseStyle, 
+          background: "linear-gradient(135deg, #a29bfe 0%, #fd79a8 100%)",
+          color: "white",
+          textShadow: "0 1px 2px rgba(0,0,0,0.2)"
+        };
+      case "eq":   
+        return { 
+          ...baseStyle, 
+          background: "linear-gradient(135deg, #ff6b6b 0%, #feca57 50%, #48dbfb 100%)",
+          color: "white",
+          fontSize: 20,
+          fontWeight: 700,
+          textShadow: "0 2px 4px rgba(0,0,0,0.3)",
+          boxShadow: "0 6px 20px rgba(255,107,107,0.4), 0 2px 8px rgba(255,255,255,.2) inset"
+        };
+      default:     
+        return {
+          ...baseStyle,
+          background: "linear-gradient(135deg, rgba(70, 70, 110, 0.9) 0%, rgba(55, 55, 95, 0.95) 100%)",
+          color: "#ffffff",
+        };
     }
   };
 
   // ---------- render ----------
   return (
-    <div style={S.page}>
+    <div style={{
+      padding: 20,
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #ffeaa7 0%, #fab1a0 25%, #fd79a8 50%, #e84393 75%, #6c5ce7 100%)",
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
+    }}>
       {/* Top bar */}
-      <div style={S.topBar}>
-        <div style={S.topRow}>
-          <h1 style={S.title}>AI-Enhanced Calculator</h1>
-          <div style={S.controls}>
-            <label style={{ fontSize: 12 }}>Angle</label>
+      <div style={{
+        maxWidth: 400, 
+        margin: "0 auto 20px",
+        background: "rgba(25, 25, 45, 0.9)",
+        backdropFilter: "blur(30px)",
+        borderRadius: 20,
+        padding: 16,
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        boxShadow: "0 20px 60px rgba(0,0,0,.3), 0 4px 15px rgba(255,255,255,.05) inset",
+      }}>
+        <div style={{
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center" 
+        }}>
+          <h1 style={{
+            fontSize: 26, 
+            margin: 0, 
+            fontWeight: 700,
+            color: "white",
+            textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)"
+          }}>
+            AI Assisted Calculator
+          </h1>
+          <div style={{
+            display: "flex", 
+            alignItems: "center", 
+            gap: 12,
+            color: "white"
+          }}>
+            <label style={{ fontSize: 14, fontWeight: 600 }}>Angle</label>
             <select
               value={angleMode}
               onChange={e => setAngleMode(e.target.value as "RAD" | "DEG")}
               aria-label="Angle mode"
+              style={{
+                background: "rgba(70, 70, 110, 0.8)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                borderRadius: 8,
+                padding: "4px 8px",
+                color: "white",
+                fontSize: 12
+              }}
             >
-              <option value="RAD">RAD</option>
-              <option value="DEG">DEG</option>
+              <option value="RAD" style={{ color: "white", background: "rgba(70, 70, 110, 0.9)" }}>RAD</option>
+              <option value="DEG" style={{ color: "white", background: "rgba(70, 70, 110, 0.9)" }}>DEG</option>
             </select>
-            <label style={{ fontSize: 12 }}>AI</label>
+            <label style={{ fontSize: 14, fontWeight: 600 }}>AI</label>
             <input
               type="checkbox"
               checked={useAI}
               onChange={e => setUseAI(e.target.checked)}
               aria-label="Use AI for evaluation"
+              style={{
+                transform: "scale(1.2)",
+                accentColor: "#fd79a8"
+              }}
             />
           </div>
         </div>
       </div>
 
       {/* Calculator card */}
-      <div style={S.card}>
+      <div style={{
+        maxWidth: 400,
+        margin: "0 auto",
+        background: "rgba(25, 25, 45, 0.9)",
+        backdropFilter: "blur(30px)",
+        borderRadius: 28,
+        boxShadow: "0 20px 60px rgba(0,0,0,.3), 0 4px 15px rgba(255,255,255,.05) inset",
+        padding: 24,
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+      }}>
         {/* Display */}
-        <div style={S.display}>
-          <div style={S.expr}>{expr || "\u00A0"}</div>
-          <div style={S.res}>{error ? "Error" : (result ?? "\u00A0")}</div>
+        <div style={{
+          background: "linear-gradient(135deg, rgba(35, 35, 65, 0.95) 0%, rgba(45, 45, 75, 0.9) 100%)",
+          backdropFilter: "blur(20px)",
+          color: "#ffffff",
+          borderRadius: 20,
+          padding: 16,
+          marginBottom: 16,
+          border: "1px solid rgba(255, 255, 255, 0.15)",
+          boxShadow: "0 8px 32px rgba(0,0,0,.3)"
+        }}>
+          <div style={{
+            fontSize: 14,
+            color: "rgba(255, 255, 255, 0.7)",
+            minHeight: 18,
+            textAlign: "right",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontWeight: 500
+          }}>
+            {expr || "\u00A0"}
+          </div>
+          <div style={{
+            fontSize: 32,
+            fontWeight: 700,
+            textAlign: "right",
+            minHeight: 45,
+            color: "#ffffff"
+          }}>
+            {error ? "Error" : (result ?? "\u00A0")}
+          </div>
         </div>
 
         {/* Input row */}
-        <div style={S.inputRow}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
           <input
             ref={inputRef}
             value={expr}
             onChange={e => setExpr(e.target.value)}
-            placeholder="Type an expression…"
-            style={S.input}
+            placeholder="Enter expression"
+            style={{
+              flex: 1, 
+              padding: "14px 16px", 
+              borderRadius: 16, 
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+              background: "rgba(35, 35, 65, 0.8)",
+              backdropFilter: "blur(10px)",
+              color: "#ffffff",
+              fontSize: 16,
+              fontWeight: 500,
+            }}
           />
         </div>
 
         {/* Function keys */}
-        <div style={S.fnGrid}>
+        <div style={{
+          display: "grid", 
+          gridTemplateColumns: "repeat(4, 1fr)", 
+          gap: 10, 
+          marginBottom: 16 
+        }}>
           {FN_KEYS.map(def => (
             <button
               key={def.label}
               style={keyStyle(def.variant)}
               onClick={() => handleKey(def)}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,.3), 0 2px 8px rgba(255,255,255,.15) inset";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 15px rgba(0,0,0,.2), 0 2px 8px rgba(255,255,255,.1) inset";
+              }}
             >
               {def.label}
             </button>
@@ -266,7 +343,11 @@ export default function App() {
         </div>
 
         {/* Main keypad */}
-        <div style={S.mainGrid}>
+        <div style={{
+          display: "grid", 
+          gridTemplateColumns: "repeat(4, 1fr)", 
+          gap: 10 
+        }}>
           {MAIN_KEYS.map((def, idx) => (
             <button
               key={`${def.label}-${idx}`}
@@ -275,6 +356,22 @@ export default function App() {
                 ...(def.span ? { gridColumn: `span ${def.span}` } : null)
               }}
               onClick={() => handleKey(def)}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                if (def.variant === "eq") {
+                  e.currentTarget.style.boxShadow = "0 8px 25px rgba(255,107,107,0.6), 0 2px 8px rgba(255,255,255,.3) inset";
+                } else {
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,.3), 0 2px 8px rgba(255,255,255,.15) inset";
+                }
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = "translateY(0)";
+                if (def.variant === "eq") {
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(255,107,107,0.4), 0 2px 8px rgba(255,255,255,.2) inset";
+                } else {
+                  e.currentTarget.style.boxShadow = "0 4px 15px rgba(0,0,0,.2), 0 2px 8px rgba(255,255,255,.1) inset";
+                }
+              }}
             >
               {def.label}
             </button>
@@ -282,35 +379,73 @@ export default function App() {
         </div>
 
         {/* History */}
-        <div style={{ marginTop: 12 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>History</h2>
-          <ul style={{ maxHeight: 150, overflow: "auto", paddingRight: 4, margin: 0 }}>
+        <div style={{ marginTop: 20 }}>
+          <h2 style={{
+            fontSize: 16, 
+            fontWeight: 700, 
+            marginBottom: 12,
+            color: "white",
+            textShadow: "0 1px 3px rgba(0,0,0,0.2)"
+          }}>
+            🌅 History
+          </h2>
+          <ul style={{
+            maxHeight: 180, 
+            overflow: "auto", 
+            paddingRight: 8, 
+            margin: 0
+          }}>
             {history.length === 0 && (
-              <li style={{ fontSize: 12, color: "#64748b", listStyle: "none" }}>
-                No calculations yet.
+              <li style={{ 
+                fontSize: 14, 
+                color: "rgba(255, 255, 255, 0.7)", 
+                listStyle: "none",
+                textAlign: "center",
+                padding: 16,
+                fontStyle: "italic"
+              }}>
+                No calculations yet... start creating magic! ✨
               </li>
             )}
             {history.map((h, i) => (
-              <li
-                key={i}
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 8,
-                  padding: 8,
-                  marginBottom: 6,
-                  listStyle: "none"
-                }}
-              >
-                <div style={{ fontSize: 12, color: "#64748b" }}>{h.in}</div>
-                <div style={{ textAlign: "right", fontWeight: 600 }}>= {h.out}</div>
+              <li key={i} style={{
+                background: "rgba(55, 55, 95, 0.6)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: 12,
+                padding: 12,
+                marginBottom: 8,
+                listStyle: "none"
+              }}>
+                <div style={{
+                  fontSize: 13, 
+                  color: "rgba(255, 255, 255, 0.8)",
+                  fontWeight: 500
+                }}>
+                  {h.in}
+                </div>
+                <div style={{
+                  textAlign: "right", 
+                  fontWeight: 700,
+                  color: "white",
+                  textShadow: "0 1px 2px rgba(0,0,0,0.2)"
+                }}>
+                  = {h.out}
+                </div>
               </li>
             ))}
           </ul>
         </div>
       </div>
 
-      <div style={{ textAlign: "center", fontSize: 12, color: "#64748b", marginTop: 10 }}>
-        Built with React • Local math via mathjs • Optional AI evaluation via OpenAI API
+      <div style={{
+        textAlign: "center", 
+        fontSize: 13, 
+        color: "rgba(255, 255, 255, 0.8)", 
+        marginTop: 20,
+        textShadow: "0 1px 2px rgba(0,0,0,0.2)"
+      }}>
+        Built with love 💕 • Powered by React & dreams • Math magic via mathjs
       </div>
     </div>
   );
