@@ -42,20 +42,19 @@ function hasDigitOrConst(s) {
 // Strict evaluator with mathjs + angle mode
 function evalStrict(expr, angleMode = "RAD") {
   // Allow only the tokens you said were allowed
-  const ALLOWED = /^(?:[0-9]+(?:\.[0-9]+)?|pi|e|sin|cos|tan|log10|ln|exp|sqrt|\+|\-|\*|\/|\^|\(|\)|\s|deg|rad)+$/i;
+  const ALLOWED = /^(?:[0-9]+(?:\.[0-9]+)?|pi|e|sin|cos|tan|log10|log|ln|exp|sqrt|\+|\-|\*|\/|\^|\(|\)|,|\s|deg|rad)+$/i;
   if (!ALLOWED.test(expr)) {
     throw new Error("Expression contains disallowed tokens");
   }
 
-  // Normalize constants
+  // Normalize constants / units casing
   let s = expr
     .replace(/\bPI\b/gi, "pi")
     .replace(/\bE\b/g, "e")
     .replace(/\bRAD\b/gi, "rad")
     .replace(/\bDEG\b/gi, "deg");
 
-  // Handle explicit degree/radian suffix like: 30 deg, 1.2 rad
-  // We convert "<num> deg" -> "(<num> * pi/180)" and "<num> rad" -> "(<num>)"
+  // Handle explicit "30 deg" or "1.2 rad"
   s = s.replace(/(\d+(?:\.\d+)?)\s*deg\b/gi, "($1 * pi / 180)");
   s = s.replace(/(\d+(?:\.\d+)?)\s*rad\b/gi, "($1)");
 
@@ -67,15 +66,37 @@ function evalStrict(expr, angleMode = "RAD") {
       .replace(/\btan\s*\(([^)]+)\)/gi, "tan(($1) * pi / 180)");
   }
 
-  // ln(x) -> log(x, e) in mathjs; log10(x) is supported as log10
+  // ln(x) -> natural log for mathjs (which is log(x))
   s = s.replace(/\bln\s*\(/gi, "log(");
 
-  // Evaluate with mathjs (number mode already configured)
-  const result = math.evaluate(s);
-  if (!isFinite(result)) throw new Error("Non-finite result");
-  return result;
+  // ---- Evaluate with mathjs (after rewriting single-arg log -> log10) ----
+const ast = math.parse(s);
+const transformed = ast.transform((node) => {
+  // If it's a function call named "log" with exactly ONE argument, rewrite to log10(arg)
+  if (node.isFunctionNode &&
+      node.fn?.isSymbolNode &&
+      node.fn.name === "log" &&
+      node.args.length === 1) {
+    return new math.FunctionNode(new math.SymbolNode("log10"), node.args);
+  }
+  return node;
+});
+
+const v = transformed.evaluate();
+
+// Guard: user typed a bare function like "log10" or "ln"
+if (typeof v === "function") {
+  throw new Error("Function name without argument. Try: log10(100) or ln(2.5)");
 }
 
+// Only allow real, finite numbers as results
+if (typeof v === "number") {
+  if (!Number.isFinite(v)) throw new Error("Non-finite result");
+  return v;
+}
+
+throw new Error("Unsupported (non-real) result");
+}
 
 // Try to strip English boilerplate WITHOUT making a bare number
 function tryStripEnglish(s) {

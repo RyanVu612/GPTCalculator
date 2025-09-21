@@ -63,6 +63,12 @@ export default function App() {
     if (angleMode === "DEG") q = transformForDegrees(q);
     q = q.replace(/\bln\(/g, "log("); // ln -> natural log
     const v = math.evaluate(q);
+
+    if (typeof v === "function") {
+      // User entered a bare function name like "log10" or "ln"
+      throw new Error("Finish the function call, e.g., log10(100) or ln(2.5)");
+    }
+
     return typeof v === "number" ? v : math.format(v as any);
   };
 
@@ -71,6 +77,13 @@ export default function App() {
     setError(null);
     setResult(null);
     const trimmed = expr.trim();
+    const looksIncomplete = /\b(sin|cos|tan|log10|ln|exp|sqrt)\s*$/i.test(trimmed) || /\(\s*$/.test(trimmed);
+
+    if (looksIncomplete) {
+      setError("Finish the function call, e.g., log10(100)");
+      return;
+    }
+
     if (!trimmed) return;
 
     try {
