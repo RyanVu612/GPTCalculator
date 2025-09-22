@@ -106,46 +106,23 @@ export default function App() {
 
     try {
       if (useAI) {
-        console.log("=== AI MODE DEBUG ===");
-        console.log("Input expression:", trimmed);
-        
         const r = await fetch("/api/eval", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ expression: trimmed, angleMode }),
         });
-        
-        console.log("Response status:", r.status);
         const data = await r.json();
-        console.log("Full response data:", JSON.stringify(data, null, 2));
-        
-        if (!r.ok) {
-          console.error("API Error:", data);
-          throw new Error(data?.error || "AI evaluation failed");
-        }
-        
+        if (!r.ok) throw new Error(data?.error || "AI evaluation failed");
         const out = String(data.result);
-        console.log("Final result:", out);
-        console.log("Normalized expression:", data.normalized);
-        
-        // Show debugging info in result temporarily
-        const debugResult = `${out} [Debug: normalized="${data.normalized || 'none'}"]`;
-        setResult(debugResult);
-        setHistory(h => [{ 
-          in: trimmed + (data.normalized ? ` → ${data.normalized}` : ""), 
-          out: debugResult 
-        }, ...h].slice(0, 20));
+        setResult(out);
+        setHistory(h => [{ in: trimmed, out }, ...h].slice(0, 20));
       } else {
-        console.log("=== LOCAL MODE DEBUG ===");
-        console.log("Input expression:", trimmed);
         const v = safeEvalLocal(trimmed);
         const out = String(v);
-        console.log("Local result:", out);
         setResult(out);
         setHistory(h => [{ in: trimmed, out }, ...h].slice(0, 20));
       }
     } catch (e: unknown) {
-      console.error("Evaluation error:", e);
       setError(e instanceof Error ? e.message : String(e));
     }
   };
@@ -668,7 +645,7 @@ export default function App() {
           marginTop: 20,
           textShadow: "0 1px 2px rgba(0,0,0,0.2)"
         }}>
-          Powered by React • Math via mathjs
+          Built with love 💕 • Powered by React & dreams • Math magic via mathjs
         </div>
       </div>
     </div>
