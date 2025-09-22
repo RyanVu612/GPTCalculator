@@ -39,6 +39,15 @@ function hasDigitOrConst(s) {
   return hasDigit || hasConst;
 }
 
+// Check if input looks like natural language that needs AI processing
+function isNaturalLanguage(s) {
+  // Words that suggest natural language math expressions
+  const mathWords = /\b(plus|minus|times|divided|multiply|subtract|add|square|root|sine|cosine|tangent|log|logarithm|exponential|power|raised|to the|of|what|is|calculate|compute|solve|evaluate)\b/i;
+  const numberWords = /\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)\b/i;
+  
+  return mathWords.test(s) || numberWords.test(s);
+}
+
 // Fixed evaluator with mathjs + angle mode
 function evalStrict(expr, angleMode = "RAD") {
   // Allow only the tokens you said were allowed
@@ -106,37 +115,39 @@ function evalStrict(expr, angleMode = "RAD") {
   }
 }
 
-// Try to strip English boilerplate WITHOUT making a bare number
+// Improved: Try to strip English boilerplate but be more conservative
 function tryStripEnglish(s) {
-  let t = s.replace(/[^0-9a-z+\-*/^().,\s]/gi, " ");
-  t = t.replace(/\b(what\s+is|calculate|compute|please|solve|evaluate)\b/gi, " ");
-  const keep = new Set(["sin","cos","tan","log10","ln","exp","sqrt","pi","deg","rad","e"]);
-  t = t.replace(/\b([a-z]+)\b/gi, (m, w) => (keep.has(w.toLowerCase()) ? m : " "));
+  // Only strip if we're confident this helps
+  let t = s.replace(/\b(what\s+is|calculate|compute|please|solve|evaluate|the\s+answer\s+to)\b/gi, " ");
+  
+  // Don't strip number words or math operation words - let AI handle those
   t = t.replace(/\s+/g, " ").trim();
   return t;
 }
 
-// Normalize NL → strict expression via AI
-// Normalize NL → strict expression via AI
-// Normalize NL → strict expression via AI
+// Enhanced AI normalization with better prompting
 async function normalizeWithAI(nl) {
-  const system = `You are a mathematical expression parser that converts text to exact mathematical notation.
+  const system = `You are a mathematical expression parser that converts natural language to exact mathematical notation.
 
 CRITICAL: You must NEVER evaluate, solve, or simplify expressions. Only convert format.
 
 Rules:
-- Preserve ALL mathematical functions exactly as function calls
+- Convert word numbers to digits: "five" → "5", "twenty" → "20", "one hundred" → "100"
+- Convert operation words: "plus"/"add" → "+", "minus"/"subtract" → "-", "times"/"multiply" → "*", "divided by" → "/"
+- Convert function words: "sine" → "sin", "cosine" → "cos", "tangent" → "tan", "square root" → "sqrt"
 - Use only: numbers, +, -, *, /, ^, (), sin, cos, tan, log, log10, ln, exp, sqrt, pi, e, deg, rad, commas in functions
-- Convert word numbers to digits ("three" → "3")
-- "log" means base-10 logarithm
-- "log(x, base)" means logarithm of x with given base
+- "log" means base-10 logarithm, "ln" means natural logarithm
+- For "log of X base Y" use "log(X, Y)"
+- Preserve mathematical structure and parentheses
 
 EXAMPLES - DO NOT EVALUATE:
-Input: "log(100)" → Output: "log(100)" (NOT "2")
-Input: "log(1000, 10)" → Output: "log(1000, 10)" (NOT "3")
-Input: "log of 1000 base 10" → Output: "log(1000, 10)"
-Input: "sine of 30" → Output: "sin(30)" (NOT "0.5")
-Input: "two plus three" → Output: "2 + 3" (NOT "5")
+Input: "five plus seven" → Output: "5 + 7" (NOT "12")
+Input: "two times three minus four" → Output: "2 * 3 - 4" (NOT "2")
+Input: "sine of thirty degrees" → Output: "sin(30)" (NOT "0.5")
+Input: "square root of sixteen" → Output: "sqrt(16)" (NOT "4")
+Input: "log of one hundred" → Output: "log(100)" (NOT "2")
+Input: "natural log of e" → Output: "ln(e)" (NOT "1")
+Input: "two raised to the power of three" → Output: "2 ^ 3" (NOT "8")
 
 If the input is already valid math notation, return it unchanged.
 
@@ -151,38 +162,25 @@ Return ONLY JSON: {"expression": "exact_math_notation"}`;
     const r = await openai.chat.completions.create({
       model: MODEL,
       temperature: 0,
-      response_format: "json_object",
+      response_format: { type: "json_object" },
       messages
     });
     const content = r.choices?.[0]?.message?.content ?? "";
-    const result = JSON.parse(content)?.expression;
+    console.log("AI response:", content);
     
-    // Validation: If input contained "log" and output doesn't, something went wrong
-    if (nl.toLowerCase().includes('log') && !result?.toLowerCase().includes('log')) {
-      console.warn(`AI normalization error: "${nl}" → "${result}"`);
-      // Try to fix common mistakes
-      if (nl.match(/log\s*\(\s*(\d+)\s*\)/i)) {
-        const num = nl.match(/log\s*\(\s*(\d+)\s*\)/i)[1];
-        return `log(${num})`;
-      }
-      if (nl.match(/log\s+(?:of\s+)?(\d+)/i)) {
-        const num = nl.match(/log\s+(?:of\s+)?(\d+)/i)[1];
-        return `log(${num})`;
-      }
+    const parsed = JSON.parse(content);
+    const result = parsed?.expression;
+    
+    if (!result || typeof result !== "string") {
+      throw new Error("Invalid AI response format");
     }
     
     return result;
   } catch (error) {
     console.error("AI normalization failed:", error);
-    // Fallback: if input looks like it's already math, return as-is
-    if (isLikelyMath(nl)) {
-      return nl;
-    }
     return null;
   }
 }
-
-
 
 /** ---- route ---- **/
 
@@ -193,6 +191,7 @@ app.post("/api/eval", async (req, res) => {
       return res.status(400).json({ error: "Missing expression" });
     }
     const text = expression.trim();
+    console.log("Processing expression:", text);
 
     // Special case: if input is exactly "log(number)", handle it directly
     if (/^log\s*\(\s*\d+(?:\.\d+)?\s*\)$/i.test(text)) {
@@ -216,7 +215,31 @@ app.post("/api/eval", async (req, res) => {
       }
     }
 
-    // 1) Already math? Only if it actually has an operator/function AND a digit/constant
+    // 1) If it looks like natural language, go straight to AI
+    if (isNaturalLanguage(text)) {
+      console.log("Detected natural language, using AI normalization");
+      const normalized = await normalizeWithAI(text);
+      console.log("AI normalized to:", normalized);
+      
+      if (!normalized || typeof normalized !== "string") {
+        console.log("AI normalization failed");
+        return res.status(400).json({ error: "Could not parse natural language expression" });
+      }
+      
+      try {
+        const result = evalStrict(normalized, angleMode || "RAD");
+        console.log("AI evaluation result:", result);
+        return res.json({ result, normalized });
+      } catch (e) {
+        console.log("AI evaluation failed:", e.message);
+        return res.status(400).json({ 
+          error: e?.message || "Invalid normalized expression", 
+          normalized 
+        });
+      }
+    }
+
+    // 2) Already math? Only if it actually has an operator/function AND a digit/constant
     if (isLikelyMath(text) && hasOpOrFunc(text) && hasDigitOrConst(text)) {
       console.log("Taking 'already math' path");
       try {
@@ -227,11 +250,9 @@ app.post("/api/eval", async (req, res) => {
         console.log("Direct evaluation failed:", e.message);
         console.log("Falling through to AI normalization");
       }
-    } else {
-      console.log("Not taking 'already math' path");
     }
 
-    // 2) Try stripping boilerplate; still require operator/function
+    // 3) Try minimal stripping and re-evaluate
     const stripped = tryStripEnglish(text);
     console.log("Stripped version:", stripped);
     if (
@@ -251,14 +272,14 @@ app.post("/api/eval", async (req, res) => {
       }
     }
 
-    // 3) AI normalization
-    console.log("Taking AI normalization path");
+    // 4) Final fallback: AI normalization
+    console.log("Taking final AI normalization path");
     const normalized = await normalizeWithAI(text);
     console.log("AI normalized to:", normalized);
     
     if (!normalized || typeof normalized !== "string") {
       console.log("AI normalization failed");
-      return res.status(400).json({ error: "Normalization failed" });
+      return res.status(400).json({ error: "Could not understand expression" });
     }
     
     try {
