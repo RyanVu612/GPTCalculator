@@ -87,7 +87,14 @@ export default function App() {
       throw new Error("Finish the function call, e.g., log10(100) or ln(2.5)");
     }
 
-    return typeof v === "number" ? v : math.format(v as any);
+    if (typeof v === "number") {
+      // Round to 14 decimal places to eliminate floating point errors
+      // but preserve legitimate precision
+      const rounded = Math.round(v * 1e14) / 1e14;
+      return rounded;
+    }
+
+    return math.format(v as any);
   };
 
   // ---------- actions ----------
