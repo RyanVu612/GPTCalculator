@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { create, all } from "mathjs";
-import { HelpCircle, X, Calculator } from "lucide-react";
 
 const math = create(all, { number: "number" });
 
@@ -33,7 +32,7 @@ const FN_KEYS: KeyDef[] = [
   { k: "sin(",  label: "sin",  variant: "fn" },
   { k: "cos(",  label: "cos",  variant: "fn" },
   { k: "tan(",  label: "tan",  variant: "fn" },
-  { k: "log10(", label: "log", variant: "fn" }, // <- base 10
+  { k: "log(",  label: "log",  variant: "fn" }, // <- now defaults to base 10
   { k: "ln(",   label: "ln",   variant: "fn" },
   { k: "exp(",  label: "exp",  variant: "fn" },
   { k: "sqrt(", label: "√",    variant: "fn" },
@@ -63,8 +62,25 @@ export default function App() {
   const safeEvalLocal = (s: string): number | string => {
     let q: string = s;
     if (angleMode === "DEG") q = transformForDegrees(q);
-    q = q.replace(/\bln\(/g, "log("); // ln -> natural log
-    const v = math.evaluate(q);
+    
+    // Transform log() to log10() and ln() to natural log (which is log() in mathjs)
+    // First handle ln() -> log() for natural log
+    q = q.replace(/\bln\(/g, "log(");
+    
+    // Then parse and transform single-argument log() to log10()
+    const ast = math.parse(q);
+    const transformed = ast.transform((node: any) => {
+      // If it's a function call named "log" with exactly ONE argument, rewrite to log10(arg)
+      if (node.isFunctionNode &&
+          node.fn?.isSymbolNode &&
+          node.fn.name === "log" &&
+          node.args.length === 1) {
+        return new math.FunctionNode(new math.SymbolNode("log10"), node.args);
+      }
+      return node;
+    });
+    
+    const v = transformed.evaluate();
 
     if (typeof v === "function") {
       // User entered a bare function name like "log10" or "ln"
@@ -90,23 +106,46 @@ export default function App() {
 
     try {
       if (useAI) {
+        console.log("=== AI MODE DEBUG ===");
+        console.log("Input expression:", trimmed);
+        
         const r = await fetch("/api/eval", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ expression: trimmed, angleMode }),
         });
+        
+        console.log("Response status:", r.status);
         const data = await r.json();
-        if (!r.ok) throw new Error(data?.error || "AI evaluation failed");
+        console.log("Full response data:", JSON.stringify(data, null, 2));
+        
+        if (!r.ok) {
+          console.error("API Error:", data);
+          throw new Error(data?.error || "AI evaluation failed");
+        }
+        
         const out = String(data.result);
-        setResult(out);
-        setHistory(h => [{ in: trimmed, out }, ...h].slice(0, 20));
+        console.log("Final result:", out);
+        console.log("Normalized expression:", data.normalized);
+        
+        // Show debugging info in result temporarily
+        const debugResult = `${out} [Debug: normalized="${data.normalized || 'none'}"]`;
+        setResult(debugResult);
+        setHistory(h => [{ 
+          in: trimmed + (data.normalized ? ` → ${data.normalized}` : ""), 
+          out: debugResult 
+        }, ...h].slice(0, 20));
       } else {
+        console.log("=== LOCAL MODE DEBUG ===");
+        console.log("Input expression:", trimmed);
         const v = safeEvalLocal(trimmed);
         const out = String(v);
+        console.log("Local result:", out);
         setResult(out);
         setHistory(h => [{ in: trimmed, out }, ...h].slice(0, 20));
       }
     } catch (e: unknown) {
+      console.error("Evaluation error:", e);
       setError(e instanceof Error ? e.message : String(e));
     }
   };
@@ -220,8 +259,7 @@ export default function App() {
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#74b9ff" }}>
-              <Calculator size={20} style={{ marginRight: 8, verticalAlign: "middle" }} />
-              Input Guide
+              🧮 Input Guide
             </h2>
             <button
               onClick={() => setShowHelp(false)}
@@ -230,10 +268,11 @@ export default function App() {
                 border: "none",
                 color: "rgba(255, 255, 255, 0.7)",
                 cursor: "pointer",
-                padding: 4
+                padding: 4,
+                fontSize: 18
               }}
             >
-              <X size={20} />
+              ✕
             </button>
           </div>
 
@@ -275,7 +314,10 @@ export default function App() {
                 <code style={{ background: "rgba(116, 185, 255, 0.2)", padding: "2px 6px", borderRadius: 4 }}>ln(2.5)</code> → Natural log
               </div>
               <div style={{ color: "rgba(255, 255, 255, 0.9)", marginBottom: 8 }}>
-                <code style={{ background: "rgba(116, 185, 255, 0.2)", padding: "2px 6px", borderRadius: 4 }}>log10(100)</code> → Base-10 log
+                <code style={{ background: "rgba(116, 185, 255, 0.2)", padding: "2px 6px", borderRadius: 4 }}>log(100)</code> → Base-10 log (=2)
+              </div>
+              <div style={{ color: "rgba(255, 255, 255, 0.9)", marginBottom: 8 }}>
+                <code style={{ background: "rgba(116, 185, 255, 0.2)", padding: "2px 6px", borderRadius: 4 }}>log10(100)</code> → Base-10 log (explicit)
               </div>
               <div style={{ color: "rgba(255, 255, 255, 0.9)" }}>
                 <code style={{ background: "rgba(116, 185, 255, 0.2)", padding: "2px 6px", borderRadius: 4 }}>exp(1)</code> → Exponential (e^x)
@@ -376,16 +418,17 @@ export default function App() {
                     : "rgba(70, 70, 110, 0.8)",
                   border: "1px solid rgba(255, 255, 255, 0.2)",
                   borderRadius: 8,
-                  padding: 6,
+                  padding: "6px 8px",
                   color: "white",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  transition: "all 0.2s ease"
+                  transition: "all 0.2s ease",
+                  fontSize: 14
                 }}
                 title="Show/Hide Help"
               >
-                <HelpCircle size={16} />
+                ❓
               </button>
             </div>
             <div style={{

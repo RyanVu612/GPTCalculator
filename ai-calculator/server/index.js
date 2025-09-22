@@ -40,6 +40,7 @@ function hasDigitOrConst(s) {
 }
 
 // Strict evaluator with mathjs + angle mode
+// Fixed evaluator with mathjs + angle mode
 function evalStrict(expr, angleMode = "RAD") {
   // Allow only the tokens you said were allowed
   const ALLOWED = /^(?:[0-9]+(?:\.[0-9]+)?|pi|e|sin|cos|tan|log10|log|ln|exp|sqrt|\+|\-|\*|\/|\^|\(|\)|,|\s|deg|rad)+$/i;
@@ -69,33 +70,50 @@ function evalStrict(expr, angleMode = "RAD") {
   // ln(x) -> natural log for mathjs (which is log(x))
   s = s.replace(/\bln\s*\(/gi, "log(");
 
-  // ---- Evaluate with mathjs (after rewriting single-arg log -> log10) ----
-const ast = math.parse(s);
-const transformed = ast.transform((node) => {
-  // If it's a function call named "log" with exactly ONE argument, rewrite to log10(arg)
-  if (node.isFunctionNode &&
-      node.fn?.isSymbolNode &&
-      node.fn.name === "log" &&
-      node.args.length === 1) {
-    return new math.FunctionNode(new math.SymbolNode("log10"), node.args);
+  // ---- Parse and transform log() -> log10() ----
+  try {
+    const ast = math.parse(s);
+    const transformed = ast.transform((node) => {
+      // If it's a function call named "log" with exactly ONE argument, rewrite to log10(arg)
+      if (node.isFunctionNode &&
+          node.fn?.isSymbolNode &&
+          node.fn.name === "log" &&
+          node.args.length === 1) {
+        // Create new log10 function node
+        return new math.FunctionNode(new math.SymbolNode("log10"), node.args);
+      }
+      return node;
+    });
+
+    const v = transformed.evaluate();
+
+    // Guard: user typed a bare function like "log10" or "ln"
+    if (typeof v === "function") {
+      throw new Error("Function name without argument. Try: log10(100) or ln(2.5)");
+    }
+
+    // Only allow real, finite numbers as results
+    if (typeof v === "number") {
+      if (!Number.isFinite(v)) throw new Error("Non-finite result");
+      return v;
+    }
+
+    throw new Error("Unsupported (non-real) result");
+    
+  } catch (parseError) {
+    // If parsing fails, try direct evaluation as fallback
+    console.error("Parse/transform failed, trying direct eval:", parseError);
+    const v = math.evaluate(s);
+    
+    if (typeof v === "function") {
+      throw new Error("Function name without argument. Try: log10(100) or ln(2.5)");
+    }
+    if (typeof v === "number") {
+      if (!Number.isFinite(v)) throw new Error("Non-finite result");
+      return v;
+    }
+    throw new Error("Unsupported result type");
   }
-  return node;
-});
-
-const v = transformed.evaluate();
-
-// Guard: user typed a bare function like "log10" or "ln"
-if (typeof v === "function") {
-  throw new Error("Function name without argument. Try: log10(100) or ln(2.5)");
-}
-
-// Only allow real, finite numbers as results
-if (typeof v === "number") {
-  if (!Number.isFinite(v)) throw new Error("Non-finite result");
-  return v;
-}
-
-throw new Error("Unsupported (non-real) result");
 }
 
 // Try to strip English boilerplate WITHOUT making a bare number
@@ -109,21 +127,35 @@ function tryStripEnglish(s) {
 }
 
 // Normalize NL → strict expression via AI
+// Normalize NL → strict expression via AI
+// Normalize NL → strict expression via AI
 async function normalizeWithAI(nl) {
-  const system = `You convert natural-language math into a strict expression using ONLY:
-+ - * / ^ parentheses sin cos tan log10 ln exp sqrt pi e and units "deg" or "rad".
+  const system = `You are a mathematical expression parser that converts text to exact mathematical notation.
+
+CRITICAL: You must NEVER evaluate, solve, or simplify expressions. Only convert format.
+
 Rules:
-- Convert number words to numerals (e.g., "three hundred and five" -> 305).
-- Keep all operators and structure; do not omit terms.
-- Do not evaluate; just produce the expression.
-- Return ONLY JSON: {"expression":"<strict expression>"} .`;
+- Preserve ALL mathematical functions exactly as function calls
+- Use only: numbers, +, -, *, /, ^, (), sin, cos, tan, log, log10, ln, exp, sqrt, pi, e, deg, rad
+- Convert word numbers to digits ("three" → "3")
+- "log" means base-10 logarithm
+
+EXAMPLES - DO NOT EVALUATE:
+Input: "log(100)" → Output: "log(100)" (NOT "2" or "(100)")
+Input: "log of 100" → Output: "log(100)" (NOT "2" or "(100)")  
+Input: "sine of 30" → Output: "sin(30)" (NOT "0.5")
+Input: "square root of 16" → Output: "sqrt(16)" (NOT "4")
+Input: "two plus three" → Output: "2 + 3" (NOT "5")
+
+If the input is already valid math notation, return it unchanged.
+
+Return ONLY JSON: {"expression": "exact_math_notation"}`;
 
   const messages = [
     { role: "system", content: system },
     { role: "user", content: nl }
   ];
 
-  // Preferred: JSON object
   try {
     const r = await openai.chat.completions.create({
       model: MODEL,
@@ -132,17 +164,30 @@ Rules:
       messages
     });
     const content = r.choices?.[0]?.message?.content ?? "";
-    return JSON.parse(content)?.expression;
-  } catch {
-    // Fallback: plain text, extract
-    const r = await openai.chat.completions.create({
-      model: MODEL,
-      temperature: 0,
-      messages
-    });
-    const raw = r.choices?.[0]?.message?.content ?? "";
-    const m = raw.match(/"expression"\s*:\s*"([^"]+)"/) || raw.match(/`([^`]+)`/);
-    return m ? m[1] : null;
+    const result = JSON.parse(content)?.expression;
+    
+    // Validation: If input contained "log" and output doesn't, something went wrong
+    if (nl.toLowerCase().includes('log') && !result?.toLowerCase().includes('log')) {
+      console.warn(`AI normalization error: "${nl}" → "${result}"`);
+      // Try to fix common mistakes
+      if (nl.match(/log\s*\(\s*(\d+)\s*\)/i)) {
+        const num = nl.match(/log\s*\(\s*(\d+)\s*\)/i)[1];
+        return `log(${num})`;
+      }
+      if (nl.match(/log\s+(?:of\s+)?(\d+)/i)) {
+        const num = nl.match(/log\s+(?:of\s+)?(\d+)/i)[1];
+        return `log(${num})`;
+      }
+    }
+    
+    return result;
+  } catch (error) {
+    console.error("AI normalization failed:", error);
+    // Fallback: if input looks like it's already math, return as-is
+    if (isLikelyMath(nl)) {
+      return nl;
+    }
+    return null;
   }
 }
 
@@ -158,18 +203,35 @@ app.post("/api/eval", async (req, res) => {
     }
     const text = expression.trim();
 
-    // 1) Already math? Only if it actually has an operator/function AND a digit/constant
-    if (isLikelyMath(text) && hasOpOrFunc(text) && hasDigitOrConst(text)) {
+    // Special case: if input is exactly "log(number)", handle it directly
+    if (/^log\s*\(\s*\d+(?:\.\d+)?\s*\)$/i.test(text)) {
+      console.log("Handling log() directly");
       try {
         const result = evalStrict(text, angleMode || "RAD");
-        return res.json({ result });
+        return res.json({ result, normalized: text });
       } catch (e) {
         return res.status(400).json({ error: e?.message || "Invalid expression" });
       }
     }
 
+    // 1) Already math? Only if it actually has an operator/function AND a digit/constant
+    if (isLikelyMath(text) && hasOpOrFunc(text) && hasDigitOrConst(text)) {
+      console.log("Taking 'already math' path");
+      try {
+        const result = evalStrict(text, angleMode || "RAD");
+        console.log("Direct evaluation result:", result);
+        return res.json({ result, normalized: text });
+      } catch (e) {
+        console.log("Direct evaluation failed:", e.message);
+        console.log("Falling through to AI normalization");
+      }
+    } else {
+      console.log("Not taking 'already math' path");
+    }
+
     // 2) Try stripping boilerplate; still require operator/function
     const stripped = tryStripEnglish(text);
+    console.log("Stripped version:", stripped);
     if (
       stripped &&
       stripped !== text &&
@@ -177,24 +239,36 @@ app.post("/api/eval", async (req, res) => {
       hasOpOrFunc(stripped) &&
       hasDigitOrConst(stripped)
     ) {
+      console.log("Taking 'stripped English' path");
       try {
         const result = evalStrict(stripped, angleMode || "RAD");
+        console.log("Stripped evaluation result:", result);
         return res.json({ result, normalized: stripped });
-      } catch {
-        // fall through to AI
+      } catch (e) {
+        console.log("Stripped evaluation failed:", e.message);
       }
     }
 
-    // 3) Otherwise, normalize with AI then evaluate locally
+    // 3) AI normalization
+    console.log("Taking AI normalization path");
     const normalized = await normalizeWithAI(text);
+    console.log("AI normalized to:", normalized);
+    
     if (!normalized || typeof normalized !== "string") {
+      console.log("AI normalization failed");
       return res.status(400).json({ error: "Normalization failed" });
     }
+    
     try {
       const result = evalStrict(normalized, angleMode || "RAD");
+      console.log("Final evaluation result:", result);
       return res.json({ result, normalized });
     } catch (e) {
-      return res.status(400).json({ error: e?.message || "Invalid normalized expression", normalized });
+      console.log("Final evaluation failed:", e.message);
+      return res.status(400).json({ 
+        error: e?.message || "Invalid normalized expression", 
+        normalized 
+      });
     }
   } catch (err) {
     console.error("[/api/eval] Server error:", err);
