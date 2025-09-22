@@ -95,7 +95,9 @@ function evalStrict(expr, angleMode = "RAD") {
     // Only allow real, finite numbers as results
     if (typeof v === "number") {
       if (!Number.isFinite(v)) throw new Error("Non-finite result");
-      return v;
+      // Round to 14 decimal places to eliminate floating point errors
+      const rounded = Math.round(v * 1e14) / 1e14;
+      return rounded;
     }
 
     throw new Error("Unsupported (non-real) result");
@@ -136,15 +138,16 @@ CRITICAL: You must NEVER evaluate, solve, or simplify expressions. Only convert 
 
 Rules:
 - Preserve ALL mathematical functions exactly as function calls
-- Use only: numbers, +, -, *, /, ^, (), sin, cos, tan, log, log10, ln, exp, sqrt, pi, e, deg, rad
+- Use only: numbers, +, -, *, /, ^, (), sin, cos, tan, log, log10, ln, exp, sqrt, pi, e, deg, rad, commas in functions
 - Convert word numbers to digits ("three" → "3")
 - "log" means base-10 logarithm
+- "log(x, base)" means logarithm of x with given base
 
 EXAMPLES - DO NOT EVALUATE:
-Input: "log(100)" → Output: "log(100)" (NOT "2" or "(100)")
-Input: "log of 100" → Output: "log(100)" (NOT "2" or "(100)")  
+Input: "log(100)" → Output: "log(100)" (NOT "2")
+Input: "log(1000, 10)" → Output: "log(1000, 10)" (NOT "3")
+Input: "log of 1000 base 10" → Output: "log(1000, 10)"
 Input: "sine of 30" → Output: "sin(30)" (NOT "0.5")
-Input: "square root of 16" → Output: "sqrt(16)" (NOT "4")
 Input: "two plus three" → Output: "2 + 3" (NOT "5")
 
 If the input is already valid math notation, return it unchanged.
@@ -206,6 +209,17 @@ app.post("/api/eval", async (req, res) => {
     // Special case: if input is exactly "log(number)", handle it directly
     if (/^log\s*\(\s*\d+(?:\.\d+)?\s*\)$/i.test(text)) {
       console.log("Handling log() directly");
+      try {
+        const result = evalStrict(text, angleMode || "RAD");
+        return res.json({ result, normalized: text });
+      } catch (e) {
+        return res.status(400).json({ error: e?.message || "Invalid expression" });
+      }
+    }
+
+    // Special case: if input is "log(number, base)", handle it directly
+    if (/^log\s*\(\s*\d+(?:\.\d+)?\s*,\s*\d+(?:\.\d+)?\s*\)$/i.test(text)) {
+      console.log("Handling log(x,base) directly");
       try {
         const result = evalStrict(text, angleMode || "RAD");
         return res.json({ result, normalized: text });

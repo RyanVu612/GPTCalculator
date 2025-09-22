@@ -301,6 +301,9 @@ export default function App() {
                 <code style={{ background: "rgba(116, 185, 255, 0.2)", padding: "2px 6px", borderRadius: 4 }}>log(100)</code> → Base-10 log (=2)
               </div>
               <div style={{ color: "rgba(255, 255, 255, 0.9)", marginBottom: 8 }}>
+                <code style={{ background: "rgba(116, 185, 255, 0.2)", padding: "2px 6px", borderRadius: 4 }}>log(1000, 10)</code> → Log base 10 of 1000 (=3)
+              </div>
+              <div style={{ color: "rgba(255, 255, 255, 0.9)", marginBottom: 8 }}>
                 <code style={{ background: "rgba(116, 185, 255, 0.2)", padding: "2px 6px", borderRadius: 4 }}>log10(100)</code> → Base-10 log (explicit)
               </div>
               <div style={{ color: "rgba(255, 255, 255, 0.9)" }}>
