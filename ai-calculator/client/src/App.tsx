@@ -655,7 +655,7 @@ export default function App() {
           marginTop: 20,
           textShadow: "0 1px 2px rgba(0,0,0,0.2)"
         }}>
-          Built with love 💕 • Powered by React & dreams • Math magic via mathjs
+          Powered by React• Math via mathjs
         </div>
       </div>
     </div>
