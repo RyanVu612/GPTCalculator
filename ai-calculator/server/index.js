@@ -39,7 +39,6 @@ function hasDigitOrConst(s) {
   return hasDigit || hasConst;
 }
 
-// Strict evaluator with mathjs + angle mode
 // Fixed evaluator with mathjs + angle mode
 function evalStrict(expr, angleMode = "RAD") {
   // Allow only the tokens you said were allowed
@@ -67,20 +66,19 @@ function evalStrict(expr, angleMode = "RAD") {
       .replace(/\btan\s*\(([^)]+)\)/gi, "tan(($1) * pi / 180)");
   }
 
-  // ln(x) -> natural log for mathjs (which is log(x))
-  s = s.replace(/\bln\s*\(/gi, "log(");
-
-  // ---- Parse and transform log() -> log10() ----
+  // ---- Parse and transform functions ----
   try {
     const ast = math.parse(s);
     const transformed = ast.transform((node) => {
-      // If it's a function call named "log" with exactly ONE argument, rewrite to log10(arg)
-      if (node.isFunctionNode &&
-          node.fn?.isSymbolNode &&
-          node.fn.name === "log" &&
-          node.args.length === 1) {
-        // Create new log10 function node
-        return new math.FunctionNode(new math.SymbolNode("log10"), node.args);
+      if (node.isFunctionNode && node.fn?.isSymbolNode) {
+        // Transform single-argument log() to log10()
+        if (node.fn.name === "log" && node.args.length === 1) {
+          return new math.FunctionNode(new math.SymbolNode("log10"), node.args);
+        }
+        // Transform ln() to log() (natural log in mathjs)
+        if (node.fn.name === "ln") {
+          return new math.FunctionNode(new math.SymbolNode("log"), node.args);
+        }
       }
       return node;
     });
@@ -103,18 +101,8 @@ function evalStrict(expr, angleMode = "RAD") {
     throw new Error("Unsupported (non-real) result");
     
   } catch (parseError) {
-    // If parsing fails, try direct evaluation as fallback
-    console.error("Parse/transform failed, trying direct eval:", parseError);
-    const v = math.evaluate(s);
-    
-    if (typeof v === "function") {
-      throw new Error("Function name without argument. Try: log10(100) or ln(2.5)");
-    }
-    if (typeof v === "number") {
-      if (!Number.isFinite(v)) throw new Error("Non-finite result");
-      return v;
-    }
-    throw new Error("Unsupported result type");
+    console.error("Parse/transform failed:", parseError);
+    throw new Error("Invalid mathematical expression");
   }
 }
 

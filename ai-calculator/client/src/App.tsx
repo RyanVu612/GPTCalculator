@@ -63,19 +63,18 @@ export default function App() {
     let q: string = s;
     if (angleMode === "DEG") q = transformForDegrees(q);
     
-    // Transform log() to log10() and ln() to natural log (which is log() in mathjs)
-    // First handle ln() -> log() for natural log
-    q = q.replace(/\bln\(/g, "log(");
-    
-    // Then parse and transform single-argument log() to log10()
+    // Parse and transform logarithm functions
     const ast = math.parse(q);
     const transformed = ast.transform((node: any) => {
-      // If it's a function call named "log" with exactly ONE argument, rewrite to log10(arg)
-      if (node.isFunctionNode &&
-          node.fn?.isSymbolNode &&
-          node.fn.name === "log" &&
-          node.args.length === 1) {
-        return new math.FunctionNode(new math.SymbolNode("log10"), node.args);
+      if (node.isFunctionNode && node.fn?.isSymbolNode) {
+        // Transform single-argument log() to log10()
+        if (node.fn.name === "log" && node.args.length === 1) {
+          return new math.FunctionNode(new math.SymbolNode("log10"), node.args);
+        }
+        // Transform ln() to log() (natural log in mathjs)
+        if (node.fn.name === "ln") {
+          return new math.FunctionNode(new math.SymbolNode("log"), node.args);
+        }
       }
       return node;
     });
@@ -655,7 +654,7 @@ export default function App() {
           marginTop: 20,
           textShadow: "0 1px 2px rgba(0,0,0,0.2)"
         }}>
-          Powered by React• Math via mathjs
+          Powered by React • Math via mathjs
         </div>
       </div>
     </div>
